@@ -319,6 +319,8 @@ df['2018-10-11':'2018-10-12']
 
 df['2018-10-11':'2018-10-12'].reset_index()
 
+import pandas as pd
+
 sp=pd.read_csv(
     'C:/Users/charlotte.henstock/PycharmProjects/pythonProject2/ch_03/data/sp500.csv',index_col='date',parse_dates=True
 ).drop(columns=['adj_close'])
@@ -373,3 +375,21 @@ sp_reindexed = sp.reindex(bitcoin.index).assign(
 sp_reindexed.head(10).assign(
     day_of_week=lambda x: x.index.day_name()
 )
+
+fixed_portfolio=sp_reindexed+bitcoin
+
+ax=fixed_portfolio['2017-Q4':'2018-Q2'].plot(
+    y='close', label='reindexed portfolio of S&P 500 + Bitcoin', figsize=(15,5),linewidth=2,
+    title='Reindexed portfolio vs portfolio wiht mismatched indices'
+)
+
+portfolio['2017-Q4':'2018-Q2'].plot(
+    y='close',ax=ax,linestyle='--',label='portfolio if S&P 500 + Bitcoin w/o reindexing'
+)
+
+ax.set_ylabel('price')
+ax.yaxis.set_major_formatter(StrMethodFormatter('${x:,.0f}'))
+for spine in ['top','right']:
+    ax.spines[spine].set_visible(False)
+
+plt.show()

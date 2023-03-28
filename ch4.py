@@ -143,12 +143,12 @@ volume_qbinned = pd.qcut(
 )
 volume_qbinned.value_counts()
 
-from visual_aids.misc_viz import low_med_high_bins_viz
-
-low_med_high_bins_viz(
-    fb,'volume', ylabel='volume traded',
-    title='Daily Volume Traded of Facebook Stock in 2018 (with bins)'
-)
+# from visual_aids.misc_viz import low_med_high_bins_viz
+#
+# low_med_high_bins_viz(
+#     fb,'volume', ylabel='volume traded',
+#     title='Daily Volume Traded of Facebook Stock in 2018 (with bins)'
+# )
 
 central_park_weather = weather\
     .query('station == "GHCND:USW00094728"')\
@@ -245,24 +245,24 @@ AVG=lambda x: x.TMAX.rolling('30D').mean(),
 EWMA=lambda x: x.TMAX.ewm(span=30).mean()
 ).loc['2018-09-29':'2018-10-08', ['TMAX', 'EWMA', 'AVG']].T
 
-def get_info(df):
-    return '%d rows, %d cols and max closing z-score: %d'
-        % (*df.shape, df.close.max())
-
-get_info(fb.loc['2018-Q1']\
-         .apply(lambda x: (x-x.mean())/x.stf())
-
-fb.loc['2018-Q1'].apply(lambda x: (x-x.mean())/x.std())\
-    .pipe(get_info()
-
-fb.pipe(pd.DataFrame.rolling, '20D').mean().equals(
-    fb.rolling('20D').mean()
-)
+# def get_info(df):
+#     return '%d rows, %d cols and max closing z-score: %d'
+#     %(*df.shape, df.close.max())
+#
+# get_info(fb.loc['2018-Q1']\
+#          .apply(lambda x: (x-x.mean())/x.stf())
+#
+# fb.loc['2018-Q1'].apply(lambda x: (x-x.mean())/x.std())\
+#     .pipe(get_info()
+#
+# fb.pipe(pd.DataFrame.rolling, '20D').mean().equals(
+#     fb.rolling('20D').mean()
+# )
 
 
 
 from window_calc import window_calc
-window_calc??
+#window_calc??
 
 window_calc(fb, pd.DataFrame.expanding, np.median).head()
 
@@ -275,3 +275,123 @@ window_calc(
      'AWND':'mean','PRCP':'sum'},
     '3D'
 ).head()
+
+
+fb_reindexed = fb\
+    .reindex(pd.date_range('2018-01-01', '2018-12-31', freq='D'))\
+    .assign(
+    volume=lambda x: x.volume.fillna(0),
+    close=lambda x: x.close.fillna(method='ffill'),
+    open=lambda x: x.open.combine_first(x.close),
+    high=lambda x: x.high.combine_first(x.close),
+    low=lambda x: x.low.combine_first(x.close)
+)
+fb_reindexed.assign(day=lambda x: x.index.day_name()).head(10)
+
+from pandas.api.indexers import VariableOffsetWindowIndexer
+
+indexer = VariableOffsetWindowIndexer(
+        index=fb_reindexed.index, offset=pd.offsets.BDay(3)
+)
+fb_reindexed.assign(window_start_day=0).rolling(indexer).agg({
+    'window_start_day': lambda x: x.index.min().timestamp(),
+    'open': 'mean','high': 'max', 'low':'min',
+    'close':'mean', 'volume':'sum'
+}).join(
+    fb_reindexed, lsuffix='_rolling'
+).sort_index(axis=1).assign(
+    day=lambda x: x.index.day_name(),
+window_start_day=lambda x: pd.to_datetime(x.window_start_day, unit='s')
+).head(10)
+
+pd.set_option("display.max_rows", None)
+pd.set_option("display.max_columns", None)
+pd.set_option("display.max_colwidth", None)
+pd.set_option('display.expand_frame_repr', False)
+pd.set_option('display.width', None)
+central_park_weather.loc['2018-06'].assign(
+    TOTAL_PRCP=lambda x: x.PRCP.cumsum(),
+    AVG_PRCP=lambda x: x.PRCP.expanding().mean()
+).head(10)[['PRCP', 'TOTAL_PRCP', 'AVG_PRCP']].T
+
+central_park_weather['2018-10-01':'2018-10-07'].expanding().agg(
+    {'TMAX':np.max, 'TMIN': np.min, 'AWND':np.mean, 'PRCP':np.sum}
+).join(
+    central_park_weather[['TMAX', 'TMIN', 'AWND', 'PRCP']],
+    lsuffix='_expanding'
+).sort_index(axis=1)
+
+central_park_weather.assign(
+    AVG=lambda x: x.TMAX.rolling('30D').mean(),
+    EWMA=lambda x: x.TMAX.ewm(span=30).mean()
+).loc['2018-09-29':'2018-10-08',['TMAX','EWMA','AVG']].T
+
+fb.pipe(pd.DataFrame.rolling, '20D').mean().equals(fb.rolling('20D').mean())
+
+# 3-aggregations.ipynb
+
+import numpy as np
+import pandas as pd
+
+fb = pd.read_csv('C:/Users/charlotte.henstock/PycharmProjects/pythonProject2/ch_04/data/fb_2018.csv', index_col='date', parse_dates=True).assign(
+    trading_volume=lambda x: pd.cut(x.volume, bins=3, labels=['low', 'med', 'high'])
+)
+fb.head()
+
+weather = pd.read_csv('C:/Users/charlotte.henstock/PycharmProjects/pythonProject2/ch_04/data/weather_by_station.csv', index_col='date', parse_dates=True)
+weather.head()
+
+pd.set_option('display.float_format', lambda x: '%.2f' %x)
+
+fb.agg({
+    'open': np.mean,
+    'high': np.max,
+    'low': np.min,
+    'close': np.mean,
+    'volume':np.sum
+})
+
+weather.query('station == "GHCND:USW00094728"')\
+    .pivot(columns='datatype', values='value')[['SNOW', 'PRCP']]\
+    .sum()
+
+fb.agg({
+    'open': 'mean',
+    'high': ['min', 'max'],
+    'low': ['min', 'max'],
+    'close': 'mean'
+})
+
+fb.groupby('trading_volume').mean()
+
+fb.groupby('trading_volume')['close'].agg(['min', 'max', 'mean'])
+
+fb_agg = fb.groupby('trading_volume').agg({
+    'open': 'mean',
+    'high': ['min', 'max'],
+    'low': ['min', 'max'],
+    'close': 'mean'
+})
+fb_agg
+
+fb_agg.columns
+
+fb_agg.columns = ['_'.join(col_agg) for col_agg in fb_agg.columns]
+fb_agg.head()
+
+weather.loc['2018-10'].query('datatype == "PRCP"')\
+    .groupby(level=0).mean().head().squeeze()
+
+weather.query('datatype == "PRCP"').groupby(
+    ['station_name', pd.Grouper(freq='Q')]
+).sum().unstack().sample(5, random_state=1)
+
+weather.groupby('station_name').filter(
+    lambda x: x.name.endswith('NY US')
+).query('datatype=="SNOW"').groupby('station_name').sum().squeeze()
+
+weather.query('datatype=="PRCP"')\
+    .groupby(level=0).mean()\
+    .groupby(pd.Grouper(freq='M')).sum().value.nlargest()
+
+weather.query('datatype ==')

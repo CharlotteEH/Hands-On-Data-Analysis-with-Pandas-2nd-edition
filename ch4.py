@@ -394,4 +394,234 @@ weather.query('datatype=="PRCP"')\
     .groupby(level=0).mean()\
     .groupby(pd.Grouper(freq='M')).sum().value.nlargest()
 
-weather.query('datatype ==')
+weather.query('datatype == "PRCP"')\
+    .rename(dict(value='prcp'), axis=1)\
+    .groupby(level=0).mean()\
+    .groupby(pd.Grouper(freq='M'))\
+    .transform(np.sum)['2018-01-28':'2018-02-03']
+
+weather\
+    .query('datatype=="PRCP"')\
+    .rename(dict(value='prcp'), axis=1)\
+    .groupby(level=0).mean()\
+    .assign(
+        total_prcp_in_month=lambda x:\
+    x.groupby(pd.Grouper(freq='M')).transform(np.sum),
+    pct_monthly_prcp=lambda x:\
+    x.prcp.div(x.total_prcp_in_month)
+)\
+    .nlargest(5, 'pct_monthly_prcp')
+
+fb[['open','high','low','close']]\
+    .transform(lambda x: (x - x.mean()).div(x.std()))\
+    .head()
+
+fb.pivot_table(columns='trading_volume')
+fb.pivot_table(index='trading_volume')
+
+weather.reset_index().pivot_table(
+    index=['date','station','station_name'],
+    columns='datatype',
+    values='value',
+    aggfunc='median'
+).reset_index().tail()
+
+pd.crosstab(
+    index=fb.trading_volume,
+    columns=fb.index.month,
+    colnames=['month']
+)
+
+pd.crosstab(
+    index=fb.trading_volume,
+    columns=fb.index.month,
+    colnames=['month'],
+    normalize='columns'
+)
+
+pd.crosstab(
+    index=fb.trading_volume,
+    columns=fb.index.month,
+    colnames=['month'],
+    values=fb.close,
+    aggfunc=np.mean
+)
+
+snow_data = weather.query('datatype == "SNOW"')
+pd.crosstab(
+    index=snow_data.station_name,
+    columns=snow_data.index.month,
+    colnames=['month'],
+    values=snow_data.value,
+    aggfunc=lambda x: (x>0).sum(),
+    margins=True,
+    margins_name='total observation of snow')
+
+# 4-time_series.ipynb
+
+import numpy as np
+import pandas as pd
+
+fb = pd.read_csv('C:/Users/charlotte.henstock/PycharmProjects/pythonProject2/ch_04/data/fb_2018.csv', index_col='date', parse_dates=True).assign(
+    trading_volume=lambda x: pd.cut(x.volume, bins=3, labels=['low', 'med', 'high'])
+)
+fb.head()
+
+fb['2018-10-11':'2018-10-15']
+
+fb.loc['2018-q1'].equals(fb['2018-01':'2018-03'])
+fb.first('1W')
+fb.last('1W')
+
+fb_reindexed = fb.reindex(pd.date_range('2018-01-01', '2018-12-31', freq='D'))
+fb_reindexed.first('1D').isna().squeeze().all()
+
+fb_reindexed.loc['2018-Q1'].first_valid_index()
+fb_reindexed.loc['2018-Q1'].last_valid_index()
+
+fb_reindexed.asof('2018-03-31')
+
+stock_data_per_minute = pd.read_csv(
+    'C:/Users/charlotte.henstock/PycharmProjects/pythonProject2/ch_04/data/fb_week_of_may_20_per_minute.csv', index_col='date', parse_dates=True,
+    date_parser=lambda x: pd.to_datetime(x, format='%Y-%m-%d %H-%M')
+)
+stock_data_per_minute.head()
+
+stock_data_per_minute.groupby(pd.Grouper(freq='1D')).agg({
+    'open': 'first',
+    'high': 'max',
+    'low': 'min',
+    'close': 'last',
+    'volume': 'sum'
+})
+
+stock_data_per_minute.at_time('9:30')
+
+stock_data_per_minute.between_time('15:59', '16:00')
+
+shares_traded_in_first_30_min = stock_data_per_minute\
+    .between_time('9:30', '10:00')\
+    .groupby(pd.Grouper(freq='1D'))\
+    .filter(lambda x: (x.volume>0).all())\
+    .volume.mean()
+
+shares_traded_in_last_30_min = stock_data_per_minute\
+    .between_time('15:30', '16:00')\
+    .groupby(pd.Grouper(freq='1D'))\
+    .filter(lambda x: (x.volume > 0).all())\
+    .volume.mean()
+
+shares_traded_in_first_30_min - shares_traded_in_last_30_min
+
+pd.DataFrame(
+    dict(before=stock_data_per_minute.index, after=stock_data_per_minute.index.normalize())
+).head()
+
+stock_data_per_minute.index.to_series().dt.normalize().head()
+
+fb.assign(
+    prior_close=lambda x: x.close.shift(),
+    after_hours_change_in_price=lambda x: x.open - x.prior_close,
+    abs_change=lambda x: x.after_hours_change_in_price.abs()
+).nlargest(5, 'abs_change')
+
+pd.date_range('2018-01-01', freq='D', periods=5) + pd.Timedelta('9 hours 30 minutes')
+
+(
+    fb.drop(columns='trading_volume')
+    - fb.drop(columns='trading_volume').shift()
+).equals(
+    fb.drop(columns='trading_volume').diff()
+)
+
+fb.drop(columns='trading_volume').diff().head()
+
+fb.drop(columns='trading_volume').diff(-3).head()
+
+from visual_aids.misc_viz import resampling_example
+resampling_example()
+
+array([<AxesSubplot:title={'center':'raw data'}, xlabel='date', ylabel='events'>,
+       <AxesSubplot:title={'center':'daily totals'}, xlabel='date', ylabel='events'>],
+      dtype=object)
+
+stock_data_per_minute.head()
+
+stock_data_per_minute.resample('1D').agg({
+    'open': 'first',
+    'high': 'max',
+    'low': 'min',
+    'close': 'last',
+    'volume': 'sum'
+})
+
+fb.resample('Q').mean()
+
+fb.drop(columns='trading_volume').resample('Q').apply(
+    lambda x: x.last('1D').values - x.first('1D').values
+)
+
+melted_stock_data = pd.read_csv('C:/Users/charlotte.henstock/PycharmProjects/pythonProject2/ch_04/data/melted_stock_data.csv', index_col='date', parse_dates=True)
+melted_stock_data.head()
+
+melted_stock_data.resample('1D').ohlc()['price']
+
+fb.resample('6H').asfreq().head()
+fb.resample('6H').pad().head()
+
+fb.resample('6H').fillna('nearest').head()
+
+fb.resample('6H').asfreq().assign(
+    volume=lambda x: x.volume.fillna(0),
+    close=lambda x: x.close.fillna(method='ffill'),
+    open=lambda x: x.open.combine_first(x.close),
+    high=lambda x: x.high.combine_first(x.close),
+    low=lambda x: x.low.combine_first(x.close)
+).head()
+
+import sqlite3
+
+with sqlite3.connect('C:/Users/charlotte.henstock/PycharmProjects/pythonProject2/ch_04/data/stocks.db') as connection:
+    fb_prices = pd.read_sql(
+        'SELECT * FROM fb_prices', connection,
+        index_col='date', parse_dates=['date']
+    )
+aapl_prices = pd.read_sql(
+    'SELECT * FROM aapl_prices', connection,
+    index_col='date', parse_dates=['date']
+)
+
+fb_prices.index.second.unique()
+aapl_prices.index.second.unique()
+
+pd.merge_asof(
+    fb_prices, aapl_prices,
+    left_index=True, right_index=True,
+    direction='nearest', tolerance=pd.Timedelta(30, unit='s')
+).head()
+
+pd.merge_ordered(
+    fb_prices.reset_index(), aapl_prices.reset_index()
+).set_index('date').head()
+
+pd.merge_ordered(
+    fb_prices.reset_index(), aapl_prices.reset_index(),
+    fill_method='ffill'
+).set_index('date').head()
+
+pd.merge_ordered(
+    fb_prices.reset_index(), aapl_prices.reset_index(),
+    fill_method='fillna()'
+).set_index('date').head()
+
+# exercises
+
+
+quakes = pd.read_csv('C:/Users/charlotte.henstock/PycharmProjects/pythonProject2/ch_04/exercises/earthquakes.csv')
+faang = pd.read_csv('C:/Users/charlotte.henstock/PycharmProjects/pythonProject2/ch_04/exercises/faang.csv', index_col='date', parse_dates=True)
+
+# 1. Earthquakes in Japan with magnitude mb equal and over 4.9
+
+quakes.query(
+    "parsed_place == 'Japan' and magType == 'mb' and mag>=4.9"
+)[['mag', 'magType', 'place']]

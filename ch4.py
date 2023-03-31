@@ -625,3 +625,116 @@ faang = pd.read_csv('C:/Users/charlotte.henstock/PycharmProjects/pythonProject2/
 quakes.query(
     "parsed_place == 'Japan' and magType == 'mb' and mag>=4.9"
 )[['mag', 'magType', 'place']]
+
+# 2. create bins for each full number of magnitude.  ml magnitude.  how many are in each bin
+
+quakes.query("magType == 'ml'").assign(
+    mag_bin=lambda x: pd.cut(x.mag, np.arange(0, 10))
+).mag_bin.value_counts()
+
+# 3. group the ticker and resample to monthly frequencies
+
+faang.groupby('ticker').resample('1M').agg(
+    {
+        'open': np.mean,
+        'high': np.max,
+        'low': np.min,
+        'close': np.mean,
+        'volume': np.sum
+    }
+)
+
+# 4. crosstab with earthquake data between the tsunami and magtype columns.  maximum magnitude
+# that was observed for each combination
+
+pd.crosstab(quakes.tsunami, quakes.magType, values=quakes.mag, aggfunc='max')
+
+# 5. rolling 60 day aggregations of OHLC data by ticker for the faang data.
+
+faang.groupby('ticker').rolling('60D').agg(
+    {
+        'open': np.mean,
+        'high': np.max,
+        'low': np.min,
+        'close': np.mean,
+        'volume': np.sum
+    }
+)
+
+# 6. pivot table of faang data that compares the stocks.
+
+faang.pivot_table(index='ticker')
+
+# 7. z scores of each numeric column in amzn for q4 2018
+
+faang.loc['2018-Q4'].query("ticker == 'AMZN'").drop(columns='ticker').apply(
+    lambda x: x.sub(x.mean()).div(x.std())
+).head()
+
+# 9. add event descriptions
+
+events = pd.DataFrame({
+    'ticker': 'FB',
+    'date': pd.to_datetime(
+        ['2018-07-25', '2018-03-19', '2018-03-20']
+    ),
+    'event': [
+        'Disappointing user growth announced after close.',
+        'Cambridge Analytica story',
+        'FTC investigation'
+    ]
+}).set_index(['date', 'ticker'])
+
+faang.reset_index().set_index(['date', 'ticker']).join(
+    events, how='outer'
+).loc['2018-07-24':'2018-07-27'].query("ticker == 'FB'")
+
+
+# 9.  transform to represent all the values in terms of the first date in the data.
+# divide all values for each ticker by the first value.
+
+faang = faang.reset_index().set_index(['ticker', 'date'])
+faang_index = (faang/faang.groupby(level='ticker').transform('first'))
+faang_index.groupby(level='ticker').agg('head',3)
+
+# 10. covid data
+
+covid = pd.read_csv('C:/Users/charlotte.henstock/PycharmProjects/pythonProject2/ch_04/exercises/covid19_cases.csv')\
+    .assign(date=lambda x: pd.to_datetime(x.dateRep, format='%d/%m/%Y'))\
+    .set_index('date')\
+    .replace('United_States_of_America', 'USA')\
+    .replace('United_Kingdom', 'UK')\
+    .sort_index()
+
+# for the five countries with the highest cummulative cases find the top day
+
+top_five_countries = covid\
+    .groupby('countriesAndTerritories').cases.sum()\
+    .nlargest(5).index
+
+covid[covid.countriesAndTerritories.isin(top_five_countries)]\
+    .groupby('countriesAndTerritories').cases.idxmax()
+
+# 7 day average change in covid cases for the last week for top 5
+
+covid\
+    .groupby(['countriesAndTerritories', pd.Grouper(freq='1D')]).cases.sum()\
+    .unstack(0).diff().rolling(7).mean().last('1W')[top_five_countries]
+
+# first date that countries other than china had cases
+
+covid\
+    .pivot(columns='countriesAndTerritories', values='cases')\
+    .drop(columns='China')\
+    .apply(lambda x: x[x>0].index.min())\
+    .sort_values()\
+    .rename(lambda x: x.replace('_', ' '))
+
+# rank the countries by cummulative cases with percentiles
+
+covid\
+    .pivot_table(columns='countriesAndTerritories', values='cases', aggfunc='sum')\
+    .T\
+    .transform('rank', method='max', pct=True)\
+    .sort_values('cases', ascending=False)\
+    .rename(lambda x: x.replace('_', ' '))

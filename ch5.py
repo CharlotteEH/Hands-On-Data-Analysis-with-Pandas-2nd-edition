@@ -276,3 +276,291 @@ fb.high.plot(
 )
 plt.xlabel('Price($)')
 plt.show()
+
+from statsmodels.distributions.empirical_distribution import ECDF
+
+ecdf = ECDF(quakes.query('magType=="ml"').mag)
+plt.plot(ecdf.x, ecdf.y)
+
+plt.xlabel('mag')
+plt.ylabel('cumulative probability')
+
+plt.title('ECDF of earthquake magnitude with magType ml')
+plt.show()
+
+from statsmodels.distributions.empirical_distribution import ECDF
+
+ecdf = ECDF(quakes.query('magType == "ml"').mag)
+plt.plot(ecdf.x, ecdf.y)
+
+plt.xlabel('mag')
+plt.ylabel('cumulative probability')
+
+plt.plot(
+    [3, 3], [0, 0.98], '--k',
+    [-1.5, 3], [0.98, 0.98], '--k', alpha=0.4
+)
+
+plt.ylim(0, None)
+plt.xlim(-1.25, None)
+plt.title('P(mag<=3)=98%')
+plt.show()
+
+fb.iloc[:, :4].plot(kind='box', title='Facebook OHLC Prices Box Plot')
+plt.ylabel('price ($')
+plt.show()
+
+fb.iloc[:, :4].plot(kind='box', title='Facebook OHLC Prices Box Plot', notch=True)
+plt.ylabel('price ($)')
+plt.show()
+
+fb.assign(
+    volume_bin=pd.cut(fb.volume, 3, labels=['low', 'med', 'high'])
+).groupby('volume_bin').boxplot(
+    column=['open', 'high', 'low', 'close'],
+    layout=(1, 3), figsize=(12, 3)
+)
+plt.suptitle('Facebook OHLC Box Plots by Volume Trader', y=1.1)
+plt.show()
+
+quakes[['mag', 'magType']].groupby('magType').boxplot(
+    figsize=(15, 8), subplots=False
+)
+plt.title('Earthquake Magnitude Box Plots by magType')
+plt.ylabel('magnitude')
+plt.show()
+
+quakes.parsed_place.value_counts().iloc[14::-1,].plot(
+    kind='barh', figsize=(10, 5),
+    title='Top 15 Places for Earthquakes '
+    '(September 18, 2018 - October 13, 2018)'
+)
+plt.xlabel('earthquakes')
+plt.show()
+
+quakes.groupby('parsed_place').tsunami.sum().sort_values().iloc[-10:,].plot(
+    kind='barh', figsize=(10, 5),
+    title='Top 10 Places for Tsunamis '
+    '(September 18, 2018 - October 13, 2018)'
+)
+plt.xlabel('tsunamis')
+plt.show()
+
+indonesia_quakes = quakes.query('parsed_place == "Indonesia"').assign(
+    time=lambda x: pd.to_datetime(x.time, unit='ms'),
+    earthquake=1
+).set_index('time').resample('1D').sum()
+
+indonesia_quakes.index = indonesia_quakes.index.strftime('%b\n%d')
+
+indonesia_quakes.plot(
+    y=['earthquake', 'tsunami'], kind='bar', figsize=(15, 3),
+    rot=0, label =['earthquakes', 'tsunamis'],
+    title='Earthquakes and Tsunamis in Indonesia '
+    '(September 18, 2018 - October 13, 2018)'
+)
+
+plt.xlabel('date')
+plt.ylabel('count')
+plt.show()
+
+quakes.groupby(['parsed_place', 'tsunami']).mag.count()\
+    .unstack().apply(lambda x: x/x.sum(), axis=1)\
+    .rename(columns={0: 'no', 1: 'yes'})\
+    .sort_values('yes', ascending=False)[7::-1]\
+    .plot.barh(
+        title='Frequency of a tsunami accompanying an earthquake'
+)
+
+plt.legend(title='tsunami?', bbox_to_anchor=(1, 0.65))
+
+plt.xlabel('percentage of earthquakes')
+plt.ylabel('')
+plt.tight_layout
+plt.show()
+
+quakes.magType.value_counts().plot(
+    kind='bar', title='Earthquakes Recorded per magType', rot=0
+)
+
+plt.xlabel('magType')
+plt.ylabel('earthquakes')
+plt.show()
+
+pivot = quakes.assign(
+    mag_bin=lambda x: np.floor(x.mag)
+).pivot_table(
+    index='mag_bin', columns='magType', values='mag', aggfunc='count'
+)
+pivot.plot.bar(
+    stacked=True, rot=0, ylabel='earthquakes',
+    title='Earthquakes by integer magnitude and magType'
+)
+plt.show()
+
+normalized_pivot = pivot.fillna(0).apply(lambda x: x/x.sum(), axis=1)
+ax=normalized_pivot.plot.bar(
+    stacked=True, rot=0, figsize=(10, 5),
+    title='Percentage of earthquakes by integer magnitude for each magType'
+)
+ax.legend(bbox_to_anchor=(1, 0.8))
+plt.ylabel('percentage')
+plt.show()
+
+quakes.groupby(['parsed_place', 'tsunami']).mag.count()\
+    .unstack().apply(lambda x: x/x.sum(), axis=1)\
+    .rename(columns={0: 'no', 1: 'yes'})\
+    .sort_values('yes', ascending=False)[7::-1]\
+    .plot.barh(
+        title='Frequency of a tsunami accomoanying an earthquake',
+        stacked=True
+)
+
+plt.legend(title='tsunami?', bbox_to_anchor=(1, 0.65))
+
+plt.xlabel('percentage of earthquakes')
+plt.ylabel('')
+plt.show()
+
+# 3-pandas_plotting_module.ipynb
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
+fb = pd.read_csv(
+    'C:/Users/charlotte.henstock/PycharmProjects/pythonProject2/ch_05/data/fb_stock_prices_2018.csv', index_col='date', parse_dates=True
+)
+
+from pandas.plotting import scatter_matrix
+scatter_matrix(fb, figsize=(10, 10))
+plt.show()
+
+scatter_matrix(fb, figsize=(10, 10), diagonal='kde')
+plt.show()
+
+from pandas.plotting import lag_plot
+np.random.seed(0)
+lag_plot(pd.Series(np.random.random(size=200)))
+plt.show()
+
+lag_plot(fb.close)
+plt.show()
+
+lag_plot(fb.close, lag=5)
+plt.show()
+
+from pandas.plotting import autocorrelation_plot
+np.random.seed(0)
+autocorrelation_plot(pd.Series(np.random.random(size=200)))
+plt.show()
+
+autocorrelation_plot(fb.close)
+plt.show()
+
+from pandas.plotting import bootstrap_plot
+fig = bootstrap_plot(fb.volume, fig=plt.figure(figsize=(10, 6)))
+plt.show()
+
+# exercises.
+
+# 20 rolling minimum of facebook close price
+
+
+fb = pd.read_csv(
+    'C:/Users/charlotte.henstock/PycharmProjects/pythonProject2/ch_05/data/fb_stock_prices_2018.csv', index_col='date', parse_dates=True
+)
+quakes = pd.read_csv(
+'C:/Users/charlotte.henstock/PycharmProjects/pythonProject2/ch_05/data/earthquakes.csv'
+)
+covid = pd.read_csv(
+'C:/Users/charlotte.henstock/PycharmProjects/pythonProject2/ch_05/data/covid19_cases.csv').assign(
+    date=lambda x: pd.to_datetime(x.dateRep, format='%d/%m/%Y')
+).set_index('date').replace(
+    'United_States_of_America', 'USA'
+).sort_index()['2020-01-18':'2020-09-18']
+
+fb.close.rolling('20D').min().plot(
+    title='Rolling 20D Minimum Closing Price of Facebook Stock'
+)
+plt.show()
+
+# histogram and kde of the change from open to close in the price of facebook stock
+
+differential = fb.open - fb.close
+ax = differential.plot(kind='hist', density='True', alpha=0.3)
+differential.plot(
+    kind='kde', color='blue', ax=ax,
+    title='Facenbook Stock price\'s daily change from open to close'
+)
+
+
+# box plots of each magtype for indonesia
+
+quakes.query('parsed_place == "Indonesia"')[['mag', 'magType']]\
+    .groupby('magType').boxplot(layout=(1, 4), figsize=(15, 3))
+plt.show()
+
+# line plot of the difference between teh weekly max high price and min low price
+
+fb.resample('1W').agg(
+    dict(high='max', low='min')
+).assign(
+    max_change_weekly=lambda x: x.high - x.low
+).max_change_weekly.plot(
+    title='Difference between Weekly maximum high price\n'
+    'and weekly minimum low price of facebook stock'
+)
+plt.show()
+
+# 14 day moving average of the daily change in new covid cases in
+#Brazil, china, india, spain, usa
+
+#diff() to calculate day on day changes
+# rolling to calculate 14 day average
+
+# three plots.  china, italy & spain, brazil, india, & usa
+
+fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+
+new_cases_rolling_average = covid.pivot_table(
+    index=covid.index, columns=['countriesAndTerritories'], values='cases'
+).apply(lambda x: x.diff().rolling(14).mean())
+
+new_cases_rolling_average[['China']].plot(ax=axes[0], color='red')
+new_cases_rolling_average[['Italy', 'Spain']].plot(
+    ax=axes[1], color=['magenta', 'cyan'],
+    title='14-day rolling average of change dailt covid cases\n(source: ECDC)'
+)
+new_cases_rolling_average[['Brazil', 'India', 'USA']].plot(ax=axes[2], color=['pink', 'purple', 'cyan'])
+plt.show()
+
+# use matplotlib and pandas create sublplots that show the effect after hours trading has on facebooks stock price
+
+# the daily differece between that days opening and the previous days closing
+
+# bar plot showing the effect this had monthly using resample
+
+# color the bars green and red
+
+# show the 3 letter for the month
+
+series =(fb.open - fb.close.shift())
+monthly_effect = series.resample('1M').sum()
+
+fig, axes = plt.subplots(1, 2, figsize=(10, 3))
+
+series.plot(
+    ax=axes[0],
+    title='After hours trading\n(Open Price - prior day\'s Close)'
+)
+
+monthly_effect.index = monthly_effect.index.strftime('%b')
+monthly_effect.plot(
+    ax=axes[1],
+    kind='bar',
+    title='After hours trading monthly effect',
+    color=np.where(monthly_effect>=0, 'g', 'r'),
+    rot=0
+) 
+plt.show()
